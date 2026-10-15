@@ -2,20 +2,14 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": "Run / Debug with Clang",
-      "type": "cppvsdbg",
+      "name": "Run current C++ exercise",
+      "type": "cppdbg",
       "request": "launch",
-      "program": "${workspaceFolder}/exercise-01/release/ws.exe",
-      "args": [
-        "emails.csv",
-        "identities.txt",
-        "spam.txt"
-      ],
-      "stopAtEntry": false,
-      "cwd": "${workspaceFolder}/exercise-01/release",
-      "environment": [],
-      "console": "integratedTerminal",
-      "preLaunchTask": "C/C++: clang.exe build active file"
+      "program": "${fileDirname}/a.out",
+      "args": ["emails.csv", "identities.txt", "spam.txt"],
+      "cwd": "${fileDirname}",
+      "MIMode": "lldb",
+      "preLaunchTask": "Build active C++ folder"
     }
   ]
 }
