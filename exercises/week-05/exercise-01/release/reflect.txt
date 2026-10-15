@@ -1,0 +1,29 @@
+Reflection on Workshop: Functions and Error Handling (A Mailing System)
+
+In this workshop, I implemented an extensible mailing system utilizing function objects (functors), lambda expressions, callback function pointers (the Observer design pattern), exception handling across multiple types, and the Rule of 5 to manage dynamic resources under composition and aggregation relationships.
+
+One difficulty encountered during development was managing stream formatting state. When showInbox() formatted email output using std::left for addresses and dates, the sticky formatting flag persisted across subsequent stream operations, altering the alignment of subsequent index outputs in tester_1.cpp. Restoring std::cout << std::right at the completion of showInbox() resolved this issue and guaranteed that stream manipulators in other modules were unaffected. Another important consideration was managing the observer callback pointer during copy and move operations: since observers subscribe to a specific mail server instance, observer callbacks must not be carried over to copies or duplicates, whereas plugin pointers are preserved because they are held in aggregation.
+
+Addressing the specific questions:
+
+1. The difference between the implementations/utilizations of a functor and a lambda expression. When is appropriate to use each one?
+A functor is an explicit class or struct that defines an operator() member function. Because it is a full class, it can declare member variables, constructors, destructors, and helper member functions, and can participate in object-oriented inheritance hierarchies (such as SpamFilterPlugin and VerifyIdentityPlugin deriving from Plugin). A lambda expression, in contrast, is an anonymous, compiler-generated functor (a closure type). The compiler synthesizes an unnamed class behind the scenes where captured variables become private data members and the body becomes an operator().
+Use a functor when the operation requires persistent state across calls, complex initialization (such as loading configuration from a file during construction), or needs to conform to an established polymorphic interface (like Plugin). Use a lambda expression when the operation is short, localized, and only needed temporarily at the call site—such as fixDestAddress in tester_1.cpp, which modifies message addresses in-place without the overhead of declaring a dedicated class.
+
+2. What changes would you have to make to expand the mail server to handle multiple users?
+To expand MailServer from managing a single user to managing multiple users, the following changes would be required:
+First, replace the single user fields (m_userName, m_userAddress, and m_inbox) with a collection of user accounts. A map structure such as std::unordered_map<std::string, UserAccount> (keyed by user email address) would provide efficient routing, where each UserAccount stores the user's name and their dedicated inbox (either as a dynamic Message* array or std::vector<Message>).
+Second, update receiveMail(Message msg) so that instead of comparing against a single m_userAddress, it queries the map for msg.m_toAddress. If the recipient exists, the message is routed to that user's inbox; if not, an exception is thrown indicating an unknown recipient.
+Third, query functions such as showInbox() and getInboxSize() would need to accept a user identifier (e.g., showInbox(const std::string& address)) to display or count messages for a specific user rather than the server as a whole.
+
+3. How would you change the application to allow multiple observers to be registered for the "new email arrived" event?
+To allow multiple observers to be registered:
+First, replace the single function pointer void (*onNewMailArrived)(const Message&) with a collection of callbacks, such as a dynamically resized array of function pointers or an STL container like std::vector<void(*)(const Message&)>. To allow greater flexibility (including capturing lambdas or functors), the type could be generalized to std::vector<std::function<void(const Message&)>>.
+Second, change setObserver() to addObserver() (or registerObserver()) so clients can append callbacks without overwriting previous subscribers. An unregisterObserver() method could also be provided using subscription tokens or IDs.
+Third, in receiveMail(), after inserting the message and running the plugins, iterate through the collection of observers and invoke each one:
+for (const auto& observer : m_observers) {
+    if (observer) {
+        observer(m_inbox[m_cnt - 1]);
+    }
+}
+Additionally, wrapping each callback invocation in a try-catch block would ensure that an exception thrown by one observer does not disrupt delivery or prevent other observers from receiving the notification.

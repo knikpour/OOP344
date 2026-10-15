@@ -1,0 +1,16 @@
+Reflection on Workshop: STL Containers and Filesystem Simulation
+
+In completing this workshop, I explored how to manage polymorphic objects within STL containers, handle hierarchical composite structures, apply runtime type identification, and properly manage dynamically allocated memory in C++. 
+
+One difficulty encountered during development was parsing hierarchical directory structures from flat path strings in the filesystem file and ensuring that intermediate directories were created without duplicates. Using Directory::find() at each path level allowed traversing existing directories and attaching new components accurately while keeping the parent path links consistent.
+
+Addressing the specific questions:
+
+1. Why do you need to deallocate the dynamically allocated memory in your vector of resources?
+The std::vector container manages the memory of the pointers it stores, but it does not manage or own the lifetime of the objects pointed to by those raw pointers. When the vector is destroyed or elements are removed from it, only the pointer variables themselves are cleaned up, leaving the underlying heap-allocated objects untouched. Without an explicit destructor that iterates through the vector and invokes delete on every Resource*, the dynamically allocated File and Directory objects would cause memory leaks. Moreover, deleting a Directory object triggers its own destructor, which recursively deallocates all nested files and subdirectories, ensuring clean teardown of the entire filesystem hierarchy.
+
+2. To call specific functions for a Directory object stored in a Resource*, what special C++ operation did you have to do and why?
+To call functions specific to the Directory class (such as find, operator+=, or remove) on an object stored as a Resource*, a dynamic_cast<Directory*> operation had to be performed. Resource is an abstract base class that declares a common interface, but it does not define directory-specific operations. Because the pointer could point to either a File or a Directory, a static cast would be unsafe. dynamic_cast uses Run-Time Type Information (RTTI) to verify whether the object being pointed to is actually an instance of Directory. If it is, a valid Directory* pointer is returned; if not, it evaluates to nullptr, allowing safe conditional handling.
+
+3. Could you have used std::vector<seneca::Resource> instead of std::vector<seneca::Resource*>?
+No, std::vector<seneca::Resource> could not have been used. First, Resource is an abstract base class containing pure virtual functions, and C++ does not allow instantiating abstract classes or creating containers of abstract types by value. Second, even if Resource were a concrete class, storing objects by value in a base-class vector causes object slicing: any derived File or Directory object inserted into the container would have its derived data and virtual table sliced off, leaving only the base Resource portion and destroying polymorphic behavior. Using std::vector<seneca::Resource*> stores pointers, which enables true polymorphism, dynamic dispatch, and heterogeneous storage of both files and directories in the same collection.
